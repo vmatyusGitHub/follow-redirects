@@ -148,13 +148,18 @@ RedirectableRequest.prototype.removeHeader = function (name) {
 RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
   var self = this;
   if (callback) {
-    this.on("timeout", callback);
+    this.on("response-timeout", callback);
+    this.once("socket-timeout", callback);
   }
 
   function destroyOnTimeout(socket) {
     socket.setTimeout(msecs);
     socket.removeListener("timeout", socket.destroy);
-    socket.addListener("timeout", socket.destroy);
+    // socket.addListener("timeout", socket.destroy);
+    socket.addListener("timeout", function handleSocketDestroy() {
+      socket.destroy()
+      self.emit("socket-timeout");
+    });
   }
 
   // Sets up a timer to trigger a timeout event
@@ -173,7 +178,7 @@ RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
   function clearTimer() {
     clearTimeout(self._timeout);
     if (callback) {
-      self.removeListener("timeout", callback);
+      self.removeListener("response-timeout", callback);
     }
     if (!this.socket) {
       self._currentRequest.removeListener("socket", startTimer);
